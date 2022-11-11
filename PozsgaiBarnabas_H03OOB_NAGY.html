@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="hu">
+
+<head>
+    <meta charset=utf-8>
+    <title>Three.js Points</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { width: 100%; height: 100% }
+    </style>
+</head>
+
+<body>
+
+<script async src="./dist/es-module-shims.js"></script>
+<script type="importmap">
+{
+    "imports": {
+        "three": "./js-r143/build/three.module.js",
+        "FirstPersonControls": "./js-r143/examples/jsm/controls/FirstPersonControls.js",
+        "OBJLoader": "./js-r143/examples/jsm/loaders/OBJLoader.js"
+    }
+}
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { FirstPersonControls } from 'FirstPersonControls';
+    import { OBJLoader } from 'OBJLoader';
+
+    // Globális változók
+    let WIDTH, HEIGHT, aspectRatio;
+    let windowHalfX, windowHalfY;
+    let scene, camera, controls, renderer;
+    let particles;
+    let mouseX, mouseY;
+
+    const clock = new THREE.Clock();
+
+    init();
+    animate();
+
+    function init() {
+        HEIGHT = window.innerHeight;
+        WIDTH = window.innerWidth;
+        aspectRatio = WIDTH / HEIGHT;
+        windowHalfX = window.innerWidth / 2;
+        windowHalfY = window.innerHeight / 2;
+        mouseX = 0;
+        mouseY = 0;
+
+        renderer = new THREE.WebGLRenderer( { antialias: true } );
+        renderer.setSize( WIDTH, HEIGHT );
+        renderer.setClearColor( 0x000000 );
+        document.body.appendChild( renderer.domElement );
+
+        scene = new THREE.Scene();
+
+        camera = new THREE.PerspectiveCamera( 75, aspectRatio, 0.1, 1000 );
+        camera.position.set(0, 0, 0);
+        camera.lookAt(10, 0, 0);
+        scene.add(camera);
+
+
+        controls = new FirstPersonControls( camera, renderer.domElement );
+        controls.movementSpeed = 100;
+        controls.lookSpeed = 0.03;
+
+        let ambientLight = new THREE.AmbientLight( 0xffffff, 1 );
+        scene.add( ambientLight );
+
+        //modell
+        let loader = new OBJLoader();
+        loader.load('blender_model/urhajo.obj',
+            (loaded) => {
+                let loadedMesh = loaded;
+                loadedMesh.scale.set(1, 1, 1);
+                loadedMesh.rotation.y = 89.55;
+                loadedMesh.position.z = -15;
+                loadedMesh.position.y = -5;
+                loadedMesh.traverse(( child ) => {
+                    if ( child instanceof THREE.Mesh ) {
+                        let texture = new THREE.TextureLoader().load('texture/fem.jpg');
+                        let material = new THREE.MeshLambertMaterial({ map: texture, side: THREE.DoubleSide });
+                        child.material = material;
+                    }
+                });
+                camera.add(loadedMesh);
+            },
+            (xhr) => { console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' ); },
+            ( error ) => { console.log( 'An error happened: ' + error ); }
+        );
+
+
+        //Csillagok
+        let particleCount = 10000;
+        let particlePositionAttributeSize = 3;  // 3D: vx, vy, vz
+        let vertices = [];
+        let vx, vy, vz;
+        for( let i = 0; i < particleCount; i++ ) {
+            vx = Math.random() * 2000 - 1000;
+            vy = Math.random() * 2000 - 1000;
+            vz = Math.random() * 2000 - 1000;
+            vertices.push( vx, vy, vz );
+        }
+
+        let particlesGeometry = new THREE.BufferGeometry();
+        particlesGeometry.setAttribute( 'position', new THREE.Float32BufferAttribute( vertices, particlePositionAttributeSize ) );
+        let particlesMaterial = new THREE.PointsMaterial( { size: 2, color: 0xffffff, sizeAttenuation: true, fog: true } );
+        particles = new THREE.Points( particlesGeometry, particlesMaterial );
+        scene.add( particles );
+
+        //üveg
+        /*const geometry = new THREE.IcosahedronGeometry(1, 0);
+        const material = new THREE.MeshPhysicalMaterial({
+            roughness: 0.7,
+            transmission: 1,
+            thickness: 1
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);*/
+
+
+
+
+
+
+
+        window.addEventListener( 'resize', handleWindowResize, false );
+    }
+
+    function handleWindowResize() {
+        HEIGHT = window.innerHeight;
+        WIDTH = window.innerWidth;
+        windowHalfX = window.innerWidth / 2;
+        windowHalfY = window.innerHeight / 2;
+        renderer.setSize( WIDTH, HEIGHT );
+        aspectRatio = WIDTH / HEIGHT;
+        camera.aspect = aspectRatio;
+        camera.updateProjectionMatrix();
+
+        render();
+    }
+
+    function animate() {
+        requestAnimationFrame( animate );
+        render();
+    }
+
+    function render() {
+        controls.update( clock.getDelta() );
+        renderer.render( scene, camera );
+    }
+</script>
+</body>
+</html>
