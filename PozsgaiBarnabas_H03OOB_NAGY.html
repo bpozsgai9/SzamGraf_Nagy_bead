@@ -18,15 +18,20 @@
     "imports": {
         "three": "./js-r143/build/three.module.js",
         "FirstPersonControls": "./js-r143/examples/jsm/controls/FirstPersonControls.js",
-        "OBJLoader": "./js-r143/examples/jsm/loaders/OBJLoader.js"
+        "OBJLoader": "./js-r143/examples/jsm/loaders/OBJLoader.js",
+        "MTLLoader": "./js-r143/examples/jsm/loaders/MTLLoader.js",
+        "LensFlare": "./js-r143/examples/jsm/objects/Lensflare.js"
     }
 }
 </script>
 
 <script type="module">
+    "use strict";
     import * as THREE from 'three';
     import { FirstPersonControls } from 'FirstPersonControls';
     import { OBJLoader } from 'OBJLoader';
+    import { MTLLoader } from 'MTLLoader';
+    import { Lensflare, LensflareElement } from 'LensFlare';
 
     // Globális változók
     let WIDTH, HEIGHT, aspectRatio;
@@ -34,6 +39,7 @@
     let scene, camera, controls, renderer;
     let particles;
     let mouseX, mouseY;
+    let earthMesh;
 
     const clock = new THREE.Clock();
 
@@ -52,45 +58,163 @@
         renderer = new THREE.WebGLRenderer( { antialias: true } );
         renderer.setSize( WIDTH, HEIGHT );
         renderer.setClearColor( 0x000000 );
+        renderer.shadowMap.enabled = true;
         document.body.appendChild( renderer.domElement );
+
 
         scene = new THREE.Scene();
 
         camera = new THREE.PerspectiveCamera( 75, aspectRatio, 0.1, 1000 );
-        camera.position.set(0, 0, 0);
+        camera.position.set(0, 10, -200);
         camera.lookAt(10, 0, 0);
         scene.add(camera);
 
 
         controls = new FirstPersonControls( camera, renderer.domElement );
-        controls.movementSpeed = 100;
-        controls.lookSpeed = 0.03;
+        controls.movementSpeed = 5;
+        controls.lookSpeed = 0.02;
 
-        let ambientLight = new THREE.AmbientLight( 0xffffff, 1 );
+        //fény a térben
+        let ambientLight = new THREE.AmbientLight( 0xffffff, 1);
+        ambientLight.intensity;
         scene.add( ambientLight );
 
-        //modell
-        let loader = new OBJLoader();
-        loader.load('blender_model/urhajo.obj',
+        //nap
+        let sunGeometry = new THREE.SphereGeometry( 100, 30, 30 );
+        let sunTexture = new THREE.TextureLoader().load('texture/nap.jpg');
+        let sunMaterial = new THREE.MeshStandardMaterial({
+            map: sunTexture,
+            displacementScale: 0.05,
+            roughness: 0.5
+        });
+        let sunMesh = new THREE.Mesh( sunGeometry, sunMaterial );
+        sunMesh.position.x = -600;
+        sunMesh.position.z = 800;
+        sunMesh.receiveShadow = true;
+        scene.add(sunMesh);
+
+        //napfény
+        const dirLight = new THREE.DirectionalLight( 0xffffff, 0.05 );
+        dirLight.position.set( 0, - 1, 0 ).normalize();
+        dirLight.color.setHSL( 0.1, 0.7, 0.5 );
+        scene.add( dirLight );
+
+        // lensflares - innen folyatás
+        const textureLoader = new THREE.TextureLoader();
+
+        const textureFlare0 = textureLoader.load( 'texture/lensflare/lensflare0.png' );
+        const textureFlare3 = textureLoader.load( 'texture/lensflare/lensflare3.png' );
+
+        addLight( 0.55, 0.9, 0.5, 5000, 0, - 1000 );
+        addLight( 0.08, 0.8, 0.5, 0, 0, - 1000 );
+        addLight( 0.995, 0.5, 0.9, 5000, 5000, - 1000 );
+
+        function addLight( h, s, l, x, y, z ) {
+
+            const light = new THREE.PointLight( 0xffffff, 1.5, 2000 );
+            light.color.setHSL( h, s, l );
+            light.position.set( x, y, z );
+            scene.add( light );
+
+            const lensflare = new Lensflare();
+            lensflare.addElement( new LensflareElement( textureFlare0, 700, 0, light.color ) );
+            lensflare.addElement( new LensflareElement( textureFlare3, 60, 0.6 ) );
+            lensflare.addElement( new LensflareElement( textureFlare3, 70, 0.7 ) );
+            lensflare.addElement( new LensflareElement( textureFlare3, 120, 0.9 ) );
+            lensflare.addElement( new LensflareElement( textureFlare3, 70, 1 ) );
+            light.add( lensflare );
+
+        }
+
+        //föld
+        let earthGeometry = new THREE.SphereGeometry( 100, 30, 30 );
+        let earthTexture = new THREE.TextureLoader().load('texture/fold.jpg');
+        let earthMaterial = new THREE.MeshPhongMaterial({
+            map: earthTexture,
+            displacementScale: 0.05,
+            roughness: 0.5
+        });
+        earthMesh = new THREE.Mesh( earthGeometry, earthMaterial );
+        sunMesh.receiveShadow = true;
+        scene.add(earthMesh);
+
+        //hold
+        let moonGeometry = new THREE.SphereGeometry( 20, 30, 30 );
+        let moonTexture = new THREE.TextureLoader().load('texture/hold.jpg');
+        let moonMaterial = new THREE.MeshPhongMaterial({
+            map: moonTexture,
+            displacementScale: 0.05,
+            roughness: 0.5
+        });
+        let moonMesh = new THREE.Mesh( moonGeometry, moonMaterial );
+        moonMesh.position.x = 200;
+        moonMesh.receiveShadow = true;
+        earthMesh.add(moonMesh);
+
+        //műhold modell
+        let manager = new THREE.LoadingManager();
+        let myStuff = manager.onLoad = (loaded) => {
+            console.log( 'Manager onLoad called, render started.' );
+        };
+
+        let mtlLoader = new MTLLoader();
+        let loader = new OBJLoader(manager);
+        mtlLoader.load( 'blender_model/10477_Satellite_v1_L3.mtl',
+            (materials) => {
+                materials.preload();
+                loader
+                    .setMaterials(materials)
+                    .load('blender_model/10477_Satellite_v1_L3.obj',
+                    (loaded) => {
+                        let loadedMesh = loaded;
+                        loadedMesh.scale.set(0.003, 0.003, 0.003);
+                        loadedMesh.rotation.x = 20;
+                        loadedMesh.rotation.z = 15;
+
+                        loadedMesh.position.z = -10;
+
+                        /*
+                        loadedMesh.traverse(( child ) => {
+                            if ( child instanceof THREE.Mesh ) {
+                                let texture = new THREE.TextureLoader().load('texture/fem.jpg');
+                                let material = new THREE.MeshLambertMaterial({ map:texture, side: THREE.DoubleSide });
+                                child.material = material;
+                            }
+                        });
+                        */
+
+                        camera.add(loadedMesh);
+                    },
+                    (xhr) => { console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' ); },
+                    ( error ) => { console.log( 'An error happened: ' + error );
+                    });
+        });
+
+        //aszteroida modell
+        loader.load('blender_model/asteroida.obj',
             (loaded) => {
-                let loadedMesh = loaded;
-                loadedMesh.scale.set(1, 1, 1);
-                loadedMesh.rotation.y = 89.55;
-                loadedMesh.position.z = -15;
-                loadedMesh.position.y = -5;
-                loadedMesh.traverse(( child ) => {
-                    if ( child instanceof THREE.Mesh ) {
-                        let texture = new THREE.TextureLoader().load('texture/fem.jpg');
-                        let material = new THREE.MeshLambertMaterial({ map: texture, side: THREE.DoubleSide });
+                let myAsteroid = loaded;
+                myAsteroid.scale.set(1, 1, 1);
+                myAsteroid.position.x = 10;
+                myAsteroid.name = 'myAsteroid';
+                myAsteroid.traverse(( child ) => {
+                    if (child instanceof THREE.Mesh) {
+                        let texture = new THREE.TextureLoader().load('texture/asteroid.jpg');
+                        let material = new THREE.MeshStandardMaterial({
+                            map: texture,
+                            side: THREE.DoubleSide,
+                            displacementScale: 0.05,
+                            roughness: 0.5
+                        });
                         child.material = material;
+                        scene.add(myAsteroid);
+                        //console.log(myAsteroid.name);
                     }
                 });
-                camera.add(loadedMesh);
             },
             (xhr) => { console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' ); },
             ( error ) => { console.log( 'An error happened: ' + error ); }
         );
-
 
         //Csillagok
         let particleCount = 10000;
@@ -108,7 +232,8 @@
         particlesGeometry.setAttribute( 'position', new THREE.Float32BufferAttribute( vertices, particlePositionAttributeSize ) );
         let particlesMaterial = new THREE.PointsMaterial( { size: 2, color: 0xffffff, sizeAttenuation: true, fog: true } );
         particles = new THREE.Points( particlesGeometry, particlesMaterial );
-        scene.add( particles );
+        scene.add(particles);
+
 
         //üveg
         /*const geometry = new THREE.IcosahedronGeometry(1, 0);
@@ -119,12 +244,6 @@
         });
         const mesh = new THREE.Mesh(geometry, material);
         scene.add(mesh);*/
-
-
-
-
-
-
 
         window.addEventListener( 'resize', handleWindowResize, false );
     }
@@ -144,6 +263,9 @@
 
     function animate() {
         requestAnimationFrame( animate );
+
+        earthMesh.rotation.y += 0.0005;
+
         render();
     }
 
