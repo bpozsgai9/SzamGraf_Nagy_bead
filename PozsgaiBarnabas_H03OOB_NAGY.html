@@ -3,15 +3,101 @@
 
 <head>
     <meta charset=utf-8>
-    <title>Three.js Points</title>
+    <title>Three.js Nagy Beadandó</title>
+    <link href='https://fonts.googleapis.com/css?family=Space Mono' rel='stylesheet'>
     <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { width: 100%; height: 100% }
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Space Mono';
+        }
+        .infoDiv {
+            position: absolute;
+            color: white;
+            z-index: 0;
+            width: 100%;
+            display: flex;
+            padding-top: 20px;
+        }
+        .floatLeft {
+            float: left;
+            display: inline;
+            width: 50%;
+            position: relative;
+            text-align: left;
+            padding-left: 20px;
+        }
+        .floatRight {
+            float: right;
+            display: inline;
+            width: 50%;
+            position: relative;
+            text-align: right;
+            padding-right: 20px;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        table {
+            float: right;
+        }
+        table, tr, td {
+            text-align: left;
+            border: 1px solid white;
+            border-collapse: collapse;
+            margin: 0;
+        }
+        th {
+            background-color: white;
+            color: black;
+        }
+        .infoText {
+            background-color: white;
+            color: black;
+            padding: 1px;
+        }
     </style>
 </head>
 
 <body>
-
+<div class="infoDiv">
+    <div class="floatLeft">
+        <span class="infoText">Pozsgai Barnabás</span><br>
+        <span class="infoText">H03OOB</span><br>
+        <span class="infoText">Üzemmérnök-informatika</span><br>
+        <span class="infoText">2021-22</span><br>
+    </div>
+    <div class="floatRight">
+        <table>
+            <tr>
+                <th>&nbsp;Kamera és Műhold mozgatása&nbsp;</th>
+                <td>&nbsp;egérmozgás&nbsp;</td>
+            </tr>
+            <tr>
+                <th>&nbsp;Mozgás a térben&nbsp;</th>
+                <td>&nbsp;WASD és Nyilak&nbsp;</td>
+            </tr>
+            <tr>
+                <th>&nbsp;Információ eltűntetése&nbsp;</th>
+                <td>&nbsp;I karakter&nbsp;</td>
+            </tr>
+        </table>
+    </div>
+</div>
+<script>
+    document.addEventListener('keypress', (e) => {
+        if (e.code === 'KeyI') {
+            let infodiv = document.getElementsByClassName('infoDiv')[0];
+            if (infodiv.style.display === 'none') {
+                infodiv.style.display = 'flex';
+            } else {
+                infodiv.style.display = 'none';
+            }
+        }
+    });
+</script>
 <script async src="./dist/es-module-shims.js"></script>
 <script type="importmap">
 {
@@ -44,6 +130,7 @@
     let mySatellite = null;
     let satelliteLight = null;
     let greenMesh, redMesh;
+    let blink = true;
 
     const clock = new THREE.Clock();
 
@@ -175,27 +262,27 @@
         let greenShepre = new THREE.SphereGeometry(0.07, 30, 30);
         let greenMaterial = new THREE.MeshPhongMaterial( {
             color: 0x00ff00,
-            side: THREE.DoubleSide
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 1
         });
         greenMesh = new THREE.Mesh(greenShepre, greenMaterial);
         greenMesh.position.z = -8;
         greenMesh.position.y = -2.15;
         greenMesh.position.x = 0.75;
-        greenMesh.transparent = true;
-        greenMesh.opacity = 1.0;
         camera.add(greenMesh);
 
         let redShpere = new THREE.SphereGeometry(0.07, 30, 30);
         let redMaterial = new THREE.MeshPhongMaterial( {
             color: 0xff0000,
-            side: THREE.DoubleSide
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0
         });
         redMesh = new THREE.Mesh(redShpere, redMaterial);
         redMesh.position.z = -7.7;
         redMesh.position.y = -3.5;
         redMesh.position.x = 0.8;
-        redMesh.transparent = true;
-        redMesh.opacity = 1.0;
         camera.add(redMesh);
 
         //aszteroida modell
@@ -264,12 +351,55 @@
     function animate() {
         requestAnimationFrame( animate );
 
-        //earthMesh.rotation.y += 0.0005;
+        earthMesh.rotation.y += 0.0005;
+
         if (myAsteroid != null) {
             myAsteroid.rotation.y += 0.05;
+            myAsteroid.position.x += 0.05;
+            myAsteroid.position.z += 0.05;
+
+            /*
+            for (let vertexIndex = 0; vertexIndex < myAsteroid.geometry.vertices.length; vertexIndex++) {
+
+                let localVertex = myAsteroid.geometry.vertices[vertexIndex].clone();
+                let globalVertex = myAsteroid.matrix.multiplyVector3(localVertex);
+                let directionVector = globalVertex.subSelf( myAsteroid.position );
+
+                let ray = new THREE.Ray( myAsteroid.position, directionVector.clone().normalize() );
+
+                //asteroida ütközése a földdel
+                let collisionResults = ray.intersectObjects(earthMesh);
+                if ( collisionResults.length > 0 && collisionResults.distance < directionVector.length() ) {
+
+                    // a collision occurred... do something...
+                }
+
+                //asteroida ütközése a műholddal
+                let collisionResults = ray.intersectObjects(mySatellite);
+                if ( collisionResults.length > 0 && collisionResults.distance < directionVector.length() ) {
+
+                    // a collision occurred... do something...
+                }
+            }
+             */
         }
 
-        //greenMesh.opacity -= 0.05;
+        if (blink) {
+            greenMesh.material.opacity -= 0.05;
+            redMesh.material.opacity += 0.05;
+
+            if (greenMesh.material.opacity <= 0) {
+                blink = false;
+            }
+        } else {
+            greenMesh.material.opacity += 0.05;
+            redMesh.material.opacity -= 0.05;
+
+            if (greenMesh.material.opacity >= 1) {
+                blink = true;
+            }
+        }
+
 
         render();
     }
