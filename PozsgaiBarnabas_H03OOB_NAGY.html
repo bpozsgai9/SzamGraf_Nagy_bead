@@ -40,6 +40,10 @@
     let particles;
     let mouseX, mouseY;
     let earthMesh;
+    let myAsteroid = null;
+    let mySatellite = null;
+    let satelliteLight = null;
+    let greenMesh, redMesh;
 
     const clock = new THREE.Clock();
 
@@ -59,62 +63,44 @@
         renderer.setSize( WIDTH, HEIGHT );
         renderer.setClearColor( 0x000000 );
         renderer.shadowMap.enabled = true;
+        renderer.outputEncoding = THREE.sRGBEncoding;
         document.body.appendChild( renderer.domElement );
 
-
         scene = new THREE.Scene();
+        scene.background = new THREE.Color().setHSL(0.51, 0.4, 0.01);
+        scene.fog = new THREE.Fog( scene.background, 3500, 15000 );
+
 
         camera = new THREE.PerspectiveCamera( 75, aspectRatio, 0.1, 1000 );
         camera.position.set(0, 10, -200);
         camera.lookAt(10, 0, 0);
         scene.add(camera);
 
-
         controls = new FirstPersonControls( camera, renderer.domElement );
         controls.movementSpeed = 5;
         controls.lookSpeed = 0.02;
 
-        //fény a térben
-        let ambientLight = new THREE.AmbientLight( 0xffffff, 1);
-        ambientLight.intensity;
-        scene.add( ambientLight );
-
-        //nap
-        let sunGeometry = new THREE.SphereGeometry( 100, 30, 30 );
-        let sunTexture = new THREE.TextureLoader().load('texture/nap.jpg');
-        let sunMaterial = new THREE.MeshStandardMaterial({
-            map: sunTexture,
-            displacementScale: 0.05,
-            roughness: 0.5
-        });
-        let sunMesh = new THREE.Mesh( sunGeometry, sunMaterial );
-        sunMesh.position.x = -600;
-        sunMesh.position.z = 800;
-        sunMesh.receiveShadow = true;
-        scene.add(sunMesh);
+        //dispose teszthez
+        controls.dispose();
 
         //napfény
-        const dirLight = new THREE.DirectionalLight( 0xffffff, 0.05 );
-        dirLight.position.set( 0, - 1, 0 ).normalize();
-        dirLight.color.setHSL( 0.1, 0.7, 0.5 );
-        scene.add( dirLight );
+        const sunLight = new THREE.DirectionalLight( 0xffffff, 0.05 );
+        sunLight.position.set( -600, 0, 800 ).normalize();
+        sunLight.color.setHSL( 0.1, 0.7, 0.5 );
+        sunLight.position.set(0, 0, 0);
+        scene.add(sunLight);
 
-        // lensflares - innen folyatás
-        const textureLoader = new THREE.TextureLoader();
-
-        const textureFlare0 = textureLoader.load( 'texture/lensflare/lensflare0.png' );
-        const textureFlare3 = textureLoader.load( 'texture/lensflare/lensflare3.png' );
-
-        addLight( 0.55, 0.9, 0.5, 5000, 0, - 1000 );
-        addLight( 0.08, 0.8, 0.5, 0, 0, - 1000 );
-        addLight( 0.995, 0.5, 0.9, 5000, 5000, - 1000 );
+        //napfény sugarai
+        let flareTextureLoader = new THREE.TextureLoader();
+        const textureFlare0 = flareTextureLoader.load( 'texture/lensflare/lensflare0.png' );
+        const textureFlare3 = flareTextureLoader.load( 'texture/lensflare/lensflare3.png' );
 
         function addLight( h, s, l, x, y, z ) {
 
             const light = new THREE.PointLight( 0xffffff, 1.5, 2000 );
             light.color.setHSL( h, s, l );
             light.position.set( x, y, z );
-            scene.add( light );
+            scene.add(light);
 
             const lensflare = new Lensflare();
             lensflare.addElement( new LensflareElement( textureFlare0, 700, 0, light.color ) );
@@ -122,43 +108,47 @@
             lensflare.addElement( new LensflareElement( textureFlare3, 70, 0.7 ) );
             lensflare.addElement( new LensflareElement( textureFlare3, 120, 0.9 ) );
             lensflare.addElement( new LensflareElement( textureFlare3, 70, 1 ) );
-            light.add( lensflare );
+            light.position.set(0, 0, 0);
+            light.add(lensflare);
 
         }
+        addLight( 0.55, 0.9, 0.5, 5000, 0, - 1000 );
+        addLight( 0.08, 0.8, 0.5, 0, 0, - 1000 );
+        addLight( 0.995, 0.5, 0.9, 5000, 5000, - 1000 );
+
+        //térfény
+        let ambientLight = new THREE.AmbientLight( 0xffffff, 0.2 );
+        scene.add( ambientLight );
 
         //föld
         let earthGeometry = new THREE.SphereGeometry( 100, 30, 30 );
         let earthTexture = new THREE.TextureLoader().load('texture/fold.jpg');
         let earthMaterial = new THREE.MeshPhongMaterial({
             map: earthTexture,
-            displacementScale: 0.05,
-            roughness: 0.5
+            displacementScale: 0.05
         });
         earthMesh = new THREE.Mesh( earthGeometry, earthMaterial );
-        sunMesh.receiveShadow = true;
+        earthMesh.receiveShadow = true;
+        earthMesh.position.x = 110;
         scene.add(earthMesh);
+
 
         //hold
         let moonGeometry = new THREE.SphereGeometry( 20, 30, 30 );
         let moonTexture = new THREE.TextureLoader().load('texture/hold.jpg');
         let moonMaterial = new THREE.MeshPhongMaterial({
             map: moonTexture,
-            displacementScale: 0.05,
-            roughness: 0.5
+            displacementScale: 0.05
         });
         let moonMesh = new THREE.Mesh( moonGeometry, moonMaterial );
-        moonMesh.position.x = 200;
+        moonMesh.position.x = -200;
         moonMesh.receiveShadow = true;
         earthMesh.add(moonMesh);
 
-        //műhold modell
-        let manager = new THREE.LoadingManager();
-        let myStuff = manager.onLoad = (loaded) => {
-            console.log( 'Manager onLoad called, render started.' );
-        };
 
+        //műhold modell
         let mtlLoader = new MTLLoader();
-        let loader = new OBJLoader(manager);
+        let loader = new OBJLoader();
         mtlLoader.load( 'blender_model/10477_Satellite_v1_L3.mtl',
             (materials) => {
                 materials.preload();
@@ -166,36 +156,58 @@
                     .setMaterials(materials)
                     .load('blender_model/10477_Satellite_v1_L3.obj',
                     (loaded) => {
-                        let loadedMesh = loaded;
-                        loadedMesh.scale.set(0.003, 0.003, 0.003);
-                        loadedMesh.rotation.x = 20;
-                        loadedMesh.rotation.z = 15;
+                        mySatellite = loaded;
+                        mySatellite.scale.set(0.003, 0.003, 0.003);
+                        mySatellite.rotation.x = 20;
+                        mySatellite.rotation.z = 15;
 
-                        loadedMesh.position.z = -10;
+                        mySatellite.position.z = -10;
+                        mySatellite.position.y = -1;
 
-                        /*
-                        loadedMesh.traverse(( child ) => {
-                            if ( child instanceof THREE.Mesh ) {
-                                let texture = new THREE.TextureLoader().load('texture/fem.jpg');
-                                let material = new THREE.MeshLambertMaterial({ map:texture, side: THREE.DoubleSide });
-                                child.material = material;
-                            }
-                        });
-                        */
-
-                        camera.add(loadedMesh);
+                        camera.add(mySatellite);
                     },
-                    (xhr) => { console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' ); },
-                    ( error ) => { console.log( 'An error happened: ' + error );
+                    (xhr) => { console.log( 'Satellite modell ' + ( xhr.loaded / xhr.total * 100 ) + '% loaded' ); },
+                    ( error ) => { console.log( 'Error: ' + error );
                     });
         });
+
+        //villogó piros-kék gömb
+        let greenShepre = new THREE.SphereGeometry(0.07, 30, 30);
+        let greenMaterial = new THREE.MeshPhongMaterial( {
+            color: 0x00ff00,
+            side: THREE.DoubleSide
+        });
+        greenMesh = new THREE.Mesh(greenShepre, greenMaterial);
+        greenMesh.position.z = -8;
+        greenMesh.position.y = -2.15;
+        greenMesh.position.x = 0.75;
+        greenMesh.transparent = true;
+        greenMesh.opacity = 1.0;
+        camera.add(greenMesh);
+
+        let redShpere = new THREE.SphereGeometry(0.07, 30, 30);
+        let redMaterial = new THREE.MeshPhongMaterial( {
+            color: 0xff0000,
+            side: THREE.DoubleSide
+        });
+        redMesh = new THREE.Mesh(redShpere, redMaterial);
+        redMesh.position.z = -7.7;
+        redMesh.position.y = -3.5;
+        redMesh.position.x = 0.8;
+        redMesh.transparent = true;
+        redMesh.opacity = 1.0;
+        camera.add(redMesh);
 
         //aszteroida modell
         loader.load('blender_model/asteroida.obj',
             (loaded) => {
-                let myAsteroid = loaded;
+                myAsteroid = loaded;
                 myAsteroid.scale.set(1, 1, 1);
-                myAsteroid.position.x = 10;
+
+                myAsteroid.position.x = -10;
+                myAsteroid.position.y = 15;
+                myAsteroid.position.z = -180;
+
                 myAsteroid.name = 'myAsteroid';
                 myAsteroid.traverse(( child ) => {
                     if (child instanceof THREE.Mesh) {
@@ -208,11 +220,10 @@
                         });
                         child.material = material;
                         scene.add(myAsteroid);
-                        //console.log(myAsteroid.name);
                     }
                 });
             },
-            (xhr) => { console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' ); },
+            (xhr) => { console.log( 'Asteroid modell ' + (xhr.loaded / xhr.total * 100) + '% loaded' ); },
             ( error ) => { console.log( 'An error happened: ' + error ); }
         );
 
@@ -234,17 +245,6 @@
         particles = new THREE.Points( particlesGeometry, particlesMaterial );
         scene.add(particles);
 
-
-        //üveg
-        /*const geometry = new THREE.IcosahedronGeometry(1, 0);
-        const material = new THREE.MeshPhysicalMaterial({
-            roughness: 0.7,
-            transmission: 1,
-            thickness: 1
-        });
-        const mesh = new THREE.Mesh(geometry, material);
-        scene.add(mesh);*/
-
         window.addEventListener( 'resize', handleWindowResize, false );
     }
 
@@ -264,7 +264,12 @@
     function animate() {
         requestAnimationFrame( animate );
 
-        earthMesh.rotation.y += 0.0005;
+        //earthMesh.rotation.y += 0.0005;
+        if (myAsteroid != null) {
+            myAsteroid.rotation.y += 0.05;
+        }
+
+        //greenMesh.opacity -= 0.05;
 
         render();
     }
